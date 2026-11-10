@@ -2,7 +2,7 @@
 
 Source for `dl/Jerry-Video3-Claude-Rebuild.mp4`. Credit for the original reel: @nexusboxlab (Instagram).
 
-- `sim.js`: deterministic "color takeover" ball simulation (seed 27).
+- `sim2.js`: deterministic piston simulation (seed 2). Two pistons slam together; a ball hit or squeezed by a piston (against the other piston or the wall) splits in two until the arena holds 1400 balls.
 - `render.html`: draws every frame (Jerry layout, titles, panels, terminal, arena).
 - `capture.js`: renders all frames headless with Playwright, pipes them into ffmpeg, then muxes audio.
 - `audio.js`: synthesizes the soundtrack from simulation events.

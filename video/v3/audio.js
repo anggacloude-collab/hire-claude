@@ -2,7 +2,7 @@
 const fs = require('fs');
 const [,, evFile, outFile] = process.argv;
 const SR = 44100, DUR = 60, buf = new Float32Array(SR * DUR);
-const NOTES = [523.25, 659.25, 783.99, 880.0]; // C5 E5 G5 A5 per color
+const NOTES = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5]; // C major pentatonic per color
 function tone(t, f, amp, dec, harm = 0.25) {
   const s0 = Math.floor(t * SR), len = Math.floor(dec * 6 * SR);
   for (let i = 0; i < len && s0 + i < buf.length; i++) {
@@ -17,12 +17,10 @@ const byFrame = new Map();
 for (const e of ev) { const k = Math.floor(e.t * 60); if (!byFrame.has(k)) byFrame.set(k, []); byFrame.get(k).push(e); }
 for (const [k, list] of byFrame) {
   const t = k / 60;
-  const spawns = list.filter(e => e.type === 'spawn'), conv = list.filter(e => e.type === 'convert'), arc = list.filter(e => e.type === 'arc');
-  spawns.slice(0, 2).forEach((e, j) => tone(t + j * 0.004, NOTES[e.c] * 2, 0.07, 0.07));
-  if (conv.length) { const e = conv[0]; tone(t, NOTES[e.c], 0.05 * Math.min(2.2, 1 + Math.log10(conv.length)), 0.05, 0.5); }
-  if (arc.length && k % 2 === 0) click(t, 0.025 * Math.min(2, arc.length), 1500);
-  const win = list.find(e => e.type === 'win');
-  if (win) [0, 0.09, 0.18, 0.3].forEach((d, j) => tone(t + d, NOTES[j % 4] * (j === 3 ? 2 : 1), 0.22, 0.5, 0.3));
+  const splits = list.filter(e => e.type === 'split');
+  splits.slice(0, 3).forEach((e, j) => tone(t + j * 0.005, NOTES[e.c % NOTES.length] * 2, 0.06 * (splits.length > 3 ? 1.3 : 1), 0.06));
+  if (list.some(e => e.type === 'slam')) { tone(t, 70, 0.35, 0.09, 0.1); tone(t, 140, 0.12, 0.04, 0.3); }
+  if (list.some(e => e.type === 'full')) [0, 0.09, 0.18, 0.3].forEach((d, j) => tone(t + d, NOTES[j % 4] * (j === 3 ? 2 : 1), 0.22, 0.5, 0.3));
 }
 // typing ticks while the prompt is typed (3.4s - 6.4s)
 for (let t = 3.4; t < 6.4; t += 0.035 + 0.02 * Math.abs(Math.sin(t * 37))) click(t, 0.06, 3000 + 800 * Math.sin(t * 91));

@@ -5,7 +5,7 @@
 html,body{margin:0;background:#000}
 canvas{display:block}
 </style>
-<script src="sim.js"></script>
+<script src="sim2.js"></script>
 </head><body>
 <canvas id="c" width="1080" height="1920"></canvas>
 <script>
@@ -13,13 +13,13 @@ const W = 1080, H = 1920, FPS = 60;
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const BG = '#ECE6DF', GRID = 'rgba(0,0,0,0.045)', INK = '#141414', MUTED = '#77716B', BLUE = '#2F6BFF', ORANGE = '#D97757';
 const SEG = ['#2F6BFF', '#16A34A', '#EA580C', '#7C3AED', '#E11D48', '#0D9488'];
-const SIM_START = 10, SIM_SEED = 27;
-const PROMPT = 'Rebuild this reel as code: balls in a circle arena with a spinning arc, 4 colors. Every wall hit spawns a ball. Colors convert on contact. Last color standing wins.';
+const SIM_START = 10, SIM_SEED = 2;
+const PROMPT = 'Rebuild this reel as code: balls in a circle arena, two pistons that slam together. Any ball hit or squeezed by a piston splits in two. Keep going until the arena is full.';
 const STEPS = [
   [6.9, '● Writing arena.html'],
   [7.4, '● Ball physics + collisions'],
-  [7.9, '● Spatial grid for 760 balls'],
-  [8.4, '● Spinning arc that speeds up'],
+  [7.9, '● Pistons that slam faster'],
+  [8.4, '● Squeeze → split in two'],
   [8.9, '● A sound on every hit'],
   [9.4, '✓ Done. Running it…'],
 ];
@@ -63,7 +63,7 @@ window.simEvents = [];
 function advanceSim(t) {
   const target = Math.max(0, Math.round((t - SIM_START) * FPS));
   while (simFrames < target) {
-    sim.step(1 / 120); sim.step(1 / 120); simFrames++;
+    for (let k = 0; k < 4; k++) sim.step(1 / 240); simFrames++;
     for (const e of sim.events) window.simEvents.push({ t: e.t + SIM_START, type: e.type, c: e.c, mag: e.mag });
     sim.events.length = 0;
   }
@@ -100,7 +100,7 @@ const TITLES = [
   { t0: 0, t1: 3, k: 'THE ORIGINAL · @NEXUSBOXLAB', b: 'This one got', i: '36M views' },
   { t0: 3, t1: 10, k: 'STEP 1 · ONE PROMPT', b: 'So I gave it to', i: 'Claude Code' },
   { t0: 10, t1: 30, k: 'SIDE BY SIDE', b: 'Original vs', i: "Claude's version" },
-  { t0: 30, t1: 52, k: 'WATCH THE RIGHT SIDE', b: 'Can you tell', i: 'the difference?' },
+  { t0: 30, t1: 52, k: 'WATCH THE PISTONS', b: 'Every squeeze', i: 'makes two' },
   { t0: 52, t1: 57, k: 'NO GAME ENGINE · JUST CODE', b: 'Built in', i: 'one session' },
   { t0: 57, t1: 61, k: 'WANT TO MAKE ONE?', b: 'Comment', i: '“PROMPT”' },
 ];
@@ -179,14 +179,30 @@ function arena(r, t, alpha) {
   // arena ring
   ctx.strokeStyle = 'rgba(255,255,255,0.85)'; ctx.lineWidth = Math.max(2, AR * 0.008);
   ctx.beginPath(); ctx.arc(cx, cy, AR + sim.BR * sc * 0.2, 0, Math.PI * 2); ctx.stroke();
-  // arc
-  const a0 = sim.arcAngle, a1 = a0 + sim.ARC_SPAN, ar = sim.ARC_R * sc;
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = '#7C828C'; ctx.lineWidth = sim.ARC_HT * 2 * sc;
-  ctx.beginPath(); ctx.arc(cx, cy, ar, a0, a1); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = Math.max(1, sim.ARC_HT * 0.5 * sc);
-  ctx.beginPath(); ctx.arc(cx, cy, ar + sim.ARC_HT * 0.45 * sc, a0, a1); ctx.stroke();
-  ctx.lineCap = 'butt';
+  // pistons (drawn under the balls), with a small shake on every slam
+  const sh = sim.shake * AR * 0.012 * Math.sin(t * 90);
+  ctx.save(); ctx.translate(sh, 0);
+  ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, AR + 2, 0, Math.PI * 2); ctx.clip();
+  for (const side of [-1, 1]) {
+    const g = sim.gap, hw = sim.HEAD_W * sc, hh = sim.HEAD_H * sc, rh = sim.ROD_H * sc;
+    const fx = cx + side * g * sc;                     // inner face
+    const hx = side < 0 ? fx - hw : fx, rx0 = side < 0 ? cx - AR - 10 : fx + hw, rx1 = side < 0 ? fx - hw : cx + AR + 10;
+    // rod
+    ctx.fillStyle = '#5E646E'; ctx.fillRect(Math.min(rx0, rx1), cy - rh / 2, Math.abs(rx1 - rx0), rh);
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(Math.min(rx0, rx1), cy - rh / 2, Math.abs(rx1 - rx0), rh * 0.3);
+    // head
+    const gr = ctx.createLinearGradient(0, cy - hh / 2, 0, cy + hh / 2);
+    gr.addColorStop(0, '#A7ADB6'); gr.addColorStop(0.5, '#7C828C'); gr.addColorStop(1, '#5A606A');
+    ctx.fillStyle = gr; rr(hx, cy - hh / 2, hw, hh, Math.max(2, hw * 0.12)); ctx.fill();
+    // striped face
+    ctx.fillStyle = side < 0 ? '#FFC83D' : '#FFC83D';
+    const fw = Math.max(2, hw * 0.12), fxx = side < 0 ? fx - fw : fx;
+    ctx.fillRect(fxx, cy - hh / 2 + 2, fw, hh - 4);
+    // rivets
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    for (const ry of [-0.33, 0, 0.33]) { ctx.beginPath(); ctx.arc(hx + hw / 2, cy + ry * hh, Math.max(1.5, hw * 0.07), 0, Math.PI * 2); ctx.fill(); }
+  }
+  ctx.restore();
   // balls
   const br = sim.BR * sc, d = br * 2;
   for (const b of sim.balls) {
@@ -199,31 +215,32 @@ function arena(r, t, alpha) {
       ctx.globalAlpha = alpha;
     }
   }
+  ctx.restore();
   // stats: 4 bars + counts
   const n = sim.balls.length, sy = r.y + r.h - statsH + 14, bx = r.x + 26, bw = r.w - 52;
   ctx.font = `600 ${r.w > 600 ? 24 : 20}px "JetBrains Mono"`; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,0.7)';
   ctx.fillText(`BALLS ${String(n).padStart(3, ' ')}`, bx, sy + 20);
-  ctx.textAlign = 'right'; ctx.fillText(`ARC ${(sim.arcOmega * 60 / (2 * Math.PI)).toFixed(0)} RPM`, bx + bw, sy + 20);
+  ctx.textAlign = 'right'; ctx.fillText(`SPLITS ${sim.splits}`, bx + bw, sy + 20);
   let x = bx; const by = sy + 40, bh = 16;
   ctx.save(); rr(bx, by, bw, bh, 8); ctx.clip();
   ctx.fillStyle = '#222'; ctx.fillRect(bx, by, bw, bh);
-  for (let c = 0; c < 4; c++) { const w = bw * sim.counts[c] / Math.max(1, n); ctx.fillStyle = sim.COLORS[c]; ctx.fillRect(x, by, w, bh); x += w; }
+  for (let c = 0; c < sim.COLORS.length; c++) { const w = bw * sim.counts[c] / Math.max(1, n); ctx.fillStyle = sim.COLORS[c]; ctx.fillRect(x, by, w, bh); x += w; }
   ctx.restore();
   ctx.font = `600 ${r.w > 600 ? 22 : 18}px "JetBrains Mono"`;
-  for (let c = 0; c < 4; c++) {
-    const cxx = bx + bw * (c + 0.5) / 4;
+  for (let c = 0; c < sim.COLORS.length; c++) {
+    const cxx = bx + bw * (c + 0.5) / sim.COLORS.length;
     ctx.fillStyle = sim.COLORS[c]; ctx.textAlign = 'center';
     ctx.fillText(String(sim.counts[c]), cxx, by + bh + 34);
   }
   // winner banner
-  if (sim.winner >= 0) {
-    const k = ease((t - SIM_START - sim.winTime) / 0.5);
-    const col = sim.COLORS[sim.winner];
+  if (sim.full) {
+    const k = ease((t - SIM_START - sim.fullTime) / 0.5);
+    const col = '#FFFFFF';
     ctx.globalAlpha = alpha * k;
     ctx.fillStyle = 'rgba(0,0,0,0.6)'; const bwid = AR * 1.5, bht = AR * 0.36;
     rr(cx - bwid / 2, cy - bht / 2, bwid, bht, bht * 0.25); ctx.fill();
     ctx.fillStyle = col; ctx.textAlign = 'center'; ctx.font = `800 ${Math.round(AR * 0.2)}px "Inter Display"`;
-    ctx.fillText(`${sim.NAMES[sim.winner]} WINS`, cx, cy + AR * 0.07);
+    ctx.fillText(`ARENA FULL`, cx, cy + AR * 0.07);
   }
   ctx.restore();
 }
@@ -296,7 +313,7 @@ function caption(t) {
   const C = [
     [0.3, 2.85, 'credit: @nexusboxlab on Instagram'],
     [3.3, 9.85, 'left: their reel · right: my terminal'],
-    [10.3, 51.8, 'every wall hit = +1 ball · touch = convert'],
+    [10.3, 51.8, 'pressed by a piston = splits in two'],
     [52.3, 56.8, 'HTML + JavaScript · rendered to video'],
     [57.3, 61, 'and I’ll send you the exact prompt'],
   ];
