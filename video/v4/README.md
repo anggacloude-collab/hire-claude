@@ -2,7 +2,7 @@
 
 Source for `dl/Jerry-Video4-Claude-3D-Cloth.mp4`. Credit for the original reel: @morp.hik3d (Instagram).
 
-- `scene3d.js`: Three.js scene. Verlet cloth rendered as instanced chrome chain links, red marble ball, stone box, studio lights and soft shadows.
+- `scene3d.js`: Three.js scene. Verlet cloth rendered as instanced chrome chain links, red marble ball floating above a stone box (it morphs into a cube on the second live fix), studio lights and soft shadows.
 - `render.html`: draws each frame (Jerry layout, titles, original vs. Claude panels, live-fix chat boxes, face counter).
 - `capture4.js`: renders frames with 4 parallel headless browsers (3D at 30fps), then encodes with ffmpeg.
 - `audio3d.js`: synthesizes the soundtrack (typing, whooshes, chain jingles, gold shimmer).

@@ -15,15 +15,15 @@ const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const BG = '#ECE6DF', GRID = 'rgba(0,0,0,0.045)', INK = '#141414', MUTED = '#77716B', BLUE = '#2F6BFF', ORANGE = '#D97757';
 const SEG = ['#2F6BFF', '#16A34A', '#EA580C', '#7C3AED', '#E11D48', '#0D9488'];
 const DUR = 34, SIM_START = 7;
-const DROPS = [[7.0, 4], [8.5, 8], [10.0, 16], [11.5, 32], [13.0, 64], [18.6, 128]];
-const GOLD_T = 23.4;
+const DROPS = [[7.0, 4], [8.5, 8], [10.0, 16], [11.5, 32], [13.0, 64], [14.8, 128]];
+const CUBE_T = 23.4, BOB_T = 18.4;
 const END = 28; // right panel goes solo
-const PROMPT = 'Rebuild this reel in 3D: a chain-mail net drops onto a red marble ball on a stone box. Each drop gets more detailed: 16, 64, 256, 1024, 4096 faces.';
+const PROMPT = 'Rebuild this reel in 3D: a chain-mail net drops onto a red marble ball floating above a stone box. Each drop gets more detailed: 16, 64, 256, 1024, 4096 faces.';
 const STEPS = [
   [5.0, '● Three.js scene + studio lights'],
   [5.3, '● Cloth physics (verlet)'],
   [5.6, '● Chain links as instanced meshes'],
-  [5.9, '● Collisions: ball + stone box'],
+  [5.9, '● Floating ball + collisions'],
   [6.2, '● Face counter on screen'],
   [6.5, '✓ Done. Dropping…'],
 ];
@@ -68,7 +68,8 @@ function advanceSim(t) {
   while (simFrames < target) {
     const st = SIM_START + simFrames / FPS;
     for (const [dt, n] of DROPS) if (Math.round((dt - SIM_START) * FPS) === simFrames) S3.drop(n);
-    if (Math.round((GOLD_T - SIM_START) * FPS) === simFrames) S3.setGold();
+    if (Math.round((CUBE_T - SIM_START) * FPS) === simFrames) S3.setCube();
+    if (Math.round((BOB_T - SIM_START) * FPS) === simFrames) S3.setBob();
     S3.step(); simFrames++;
   }
 }
@@ -104,9 +105,9 @@ const TITLES = [
   { t0: 0, t1: 3, k: '@MORP.HIK3D · 3D CLOTH SIM', b: 'This 3D sim got', i: '111M views' },
   { t0: 3, t1: 7, k: 'STEP 1 · ONE PROMPT', b: 'So I gave it to', i: 'Claude Code' },
   { t0: 7, t1: 16.4, k: 'SIDE BY SIDE', b: 'Original vs', i: "Claude's version" },
-  { t0: 16.4, t1: 21.4, k: 'STEP 2 · ASK FOR A FIX', b: 'More detail?', i: 'Just ask' },
-  { t0: 21.4, t1: 25, k: 'STEP 3 · MAKE IT FANCY', b: 'Make it shine?', i: 'Ask again' },
-  { t0: 25, t1: END, k: '16,384 FACES · REAL PHYSICS', b: 'Watch it', i: 'wrap the ball' },
+  { t0: 16.4, t1: 21.4, k: 'STEP 2 · ASK FOR A FIX', b: 'Make it move?', i: 'Just ask' },
+  { t0: 21.4, t1: 25, k: 'STEP 3 · CHANGE THE SHAPE', b: 'Want a cube?', i: 'Ask again' },
+  { t0: 25, t1: END, k: '16,384 FACES · REAL PHYSICS', b: 'Watch it', i: 'wrap the cube' },
   { t0: END, t1: 31, k: 'THREE.JS · NO BLENDER', b: 'Built in', i: 'one session' },
   { t0: 31, t1: DUR + 1, k: 'WANT TO MAKE ONE?', b: 'Comment', i: '“PROMPT”' },
 ];
@@ -283,10 +284,10 @@ function caption(t) {
 
 // ---------- main frame ----------
 const FIXES = [
-  { t0: 16.6, t1: 20.1, type: 16.9, edit: 17.9, done: 18.4, text: 'go to 16K faces',
-    editing: '● Editing scene.js · grid 64×64 → 128×128', ok: '✓ Done. Dropping 16,384 faces' },
-  { t0: 21.6, t1: 25.2, type: 21.9, edit: 22.9, done: 23.4, text: 'make the chain gold',
-    editing: '● Editing scene.js · chain material → gold', ok: '✓ Done. Solid gold' },
+  { t0: 16.6, t1: 20.1, type: 16.9, edit: 17.9, done: 18.4, text: 'make the ball float up and down',
+    editing: '● Editing scene.js · ball.y += sin(t)', ok: '✓ Done. It’s floating now' },
+  { t0: 21.6, t1: 25.2, type: 21.9, edit: 22.9, done: 23.4, text: 'turn the ball into a cube',
+    editing: '● Editing scene.js · sphere → cube', ok: '✓ Done. It’s a cube now' },
 ];
 function fixBox(r, t) {
   for (const F of FIXES) {

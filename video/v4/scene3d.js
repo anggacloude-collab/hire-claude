@@ -3,11 +3,17 @@ import * as THREE from 'three';
 import { RoomEnvironment } from './node_modules/three/examples/jsm/environments/RoomEnvironment.js';
 
 const W = 940, H = 1000;
-const BALL = { x: 0, y: 2.22, z: 0, r: 0.8 };
+const BALL = { x: 0, y: 3.12, z: 0, r: 0.8, y0: 3.12 };
+const CUBE_H = 0.72, CUBE_RR = 0.12;   // half size and corner radius of the cube the ball turns into
 const BOX = { hw: 0.95, top: 1.9 };
 const CLOTH = 3.3;            // cloth side length
 const G = -9.8;
 
+function cubeSDF(x, y, z) {
+  const b = CUBE_H - CUBE_RR, qx = Math.abs(x) - b, qy = Math.abs(y) - b, qz = Math.abs(z) - b;
+  return Math.hypot(Math.max(qx, 0), Math.max(qy, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qy, qz), 0) - CUBE_RR;
+}
+function shapeSDF(x, y, z, k) { return (Math.hypot(x, y, z) - BALL.r) * (1 - k) + cubeSDF(x, y, z) * k; }
 function rng(seed) { return () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 
 function canvasTex(w, h, draw) {
@@ -75,7 +81,22 @@ export function createScene() {
     }
     for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(40,0,6,${r() * 0.25})`; g.fillRect(r() * w, r() * h, 2, 2); }
   });
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(BALL.r, 96, 64),
+  const ballGeo = new THREE.SphereGeometry(BALL.r, 128, 96);
+  {
+    // morph target: the same vertices pushed out onto a rounded cube
+    const P = ballGeo.attributes.position, mp = new Float32Array(P.count * 3), mn = new Float32Array(P.count * 3);
+    for (let i = 0; i < P.count; i++) {
+      const x = P.getX(i), y = P.getY(i), z = P.getZ(i), l = Math.hypot(x, y, z), dx = x / l, dy = y / l, dz = z / l;
+      let lo = 0, hi = 2;
+      for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (cubeSDF(dx * m, dy * m, dz * m) > 0) hi = m; else lo = m; }
+      const px = dx * lo, py = dy * lo, pz = dz * lo; mp.set([px, py, pz], i * 3);
+      const e = 1e-3, gx = cubeSDF(px + e, py, pz) - cubeSDF(px - e, py, pz), gy = cubeSDF(px, py + e, pz) - cubeSDF(px, py - e, pz), gz = cubeSDF(px, py, pz + e) - cubeSDF(px, py, pz - e), gl = Math.hypot(gx, gy, gz) || 1;
+      mn.set([gx / gl, gy / gl, gz / gl], i * 3);
+    }
+    ballGeo.morphAttributes.position = [new THREE.BufferAttribute(mp, 3)];
+    ballGeo.morphAttributes.normal = [new THREE.BufferAttribute(mn, 3)];
+  }
+  const ball = new THREE.Mesh(ballGeo,
     new THREE.MeshPhysicalMaterial({ map: marble, roughness: 0.18, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06 }));
   ball.position.set(BALL.x, BALL.y, BALL.z); ball.castShadow = ball.receiveShadow = true; scene.add(ball);
 
@@ -83,7 +104,7 @@ export function createScene() {
   const chainMat = new THREE.MeshStandardMaterial({ color: 0xAEB4BC, metalness: 1, roughness: 0.28, envMapIntensity: 1.0 });
   const CHROME = new THREE.Color(0xAEB4BC), GOLD = new THREE.Color(0xFFC35A);
 
-  const S = { canvas, renderer, scene, camera, cloth: null, t: 0, faces: 0, gold: 0, goldTarget: 0 };
+  const S = { canvas, renderer, scene, camera, cloth: null, t: 0, faces: 0, gold: 0, cube: 0, cubeTarget: 0, bobOn: false, bobAmp: 0, bobPh: 0 };
 
   // ---------- cloth ----------
   function makeCloth(n, seed) {
@@ -121,9 +142,13 @@ export function createScene() {
     for (let i = 0; i < c.N; i++) {
       const k = i * 3; let x = p[k], y = p[k + 1], z = p[k + 2];
       // ball
-      const dx = x - BALL.x, dy = y - BALL.y, dz = z - BALL.z, d = Math.sqrt(dx * dx + dy * dy + dz * dz), R = BALL.r + th;
-      if (d < R) {
-        const s = R / d; x = BALL.x + dx * s; y = BALL.y + dy * s; z = BALL.z + dz * s;
+      const dx = x - BALL.x, dy = y - BALL.y, dz = z - BALL.z;
+      const cu = S.cube, dist = cu < 1e-4 ? Math.sqrt(dx * dx + dy * dy + dz * dz) - BALL.r : shapeSDF(dx, dy, dz, cu);
+      if (dist < th) {
+        let nx, ny, nz;
+        if (cu < 1e-4) { const l = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1; nx = dx / l; ny = dy / l; nz = dz / l; }
+        else { const e = 2e-3; nx = shapeSDF(dx + e, dy, dz, cu) - shapeSDF(dx - e, dy, dz, cu); ny = shapeSDF(dx, dy + e, dz, cu) - shapeSDF(dx, dy - e, dz, cu); nz = shapeSDF(dx, dy, dz + e, cu) - shapeSDF(dx, dy, dz - e, cu); const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l; }
+        const push = th - dist; x += nx * push; y += ny * push; z += nz * push;
         // friction: damp tangential motion so the net grips the ball
         q[k] = x + (q[k] - x) * 0.25 + (x - p[k]) * 0; q[k + 1] = y + (q[k + 1] - y) * 0.25; q[k + 2] = z + (q[k + 2] - z) * 0.25;
         q[k] = p[k] + (q[k] - p[k]); // keep
@@ -182,21 +207,26 @@ export function createScene() {
     if (S.cloth) disposeCloth(S.cloth);
     S.cloth = makeCloth(n, seed || n * 7 + 3); S.faces = n * n; S.dropT = S.t;
   };
-  S.setGold = function () { S.goldTarget = 1; };
+  S.setCube = function () { S.cubeTarget = 1; };
+  S.setBob = function () { S.bobOn = true; };
   // advance physics by one video frame (1/60 s)
   S.step = function () {
     const sub = 4, dt = 1 / 60 / sub;
     S.t += 1 / 60;
     if (S.cloth) { for (let s = 0; s < sub; s++) stepCloth(S.cloth, dt); S.cloth.age += 1 / 60; }
-    S.gold += (S.goldTarget - S.gold) * 0.06;
+    if (S.cube < S.cubeTarget) { S.cubeU = Math.min(1, (S.cubeU || 0) + 1 / 60 / 0.9); const u = S.cubeU; S.cube = u * u * (3 - 2 * u); }
+    // the ball hovers still; after the live fix it starts floating up and down
+    if (S.bobOn) { S.bobAmp = Math.min(0.28, S.bobAmp + 1 / 60 * 0.45); S.bobPh += 1 / 60 * 2.2; }
+    BALL.y = BALL.y0 + S.bobAmp * Math.sin(S.bobPh);
   };
   S.render = function (t) {
     if (S.cloth) updateMeshes(S.cloth);
     chainMat.color.copy(CHROME).lerp(GOLD, S.gold);
     chainMat.roughness = 0.2 + 0.05 * S.gold;
     const a = 0.32 * Math.sin(t * 0.25) + 0.15, dist = 8.2;
-    camera.position.set(Math.sin(a) * dist, 3.55, Math.cos(a) * dist);
-    camera.lookAt(0, 1.95, 0);
+    ball.position.y = BALL.y; ball.morphTargetInfluences[0] = S.cube;
+    camera.position.set(Math.sin(a) * dist, 3.9, Math.cos(a) * dist);
+    camera.lookAt(0, 2.35, 0);
     renderer.render(scene, camera);
     return canvas;
   };

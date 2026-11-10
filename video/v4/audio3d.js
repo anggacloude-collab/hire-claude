@@ -29,7 +29,7 @@ typing(3.3, 4.8);
 [5.0, 5.3, 5.6, 5.9, 6.2].forEach(t => tone(t, 1046.5, 0.08, 0.04));
 tone(6.5, 1318.5, 0.12, 0.12); tone(6.6, 1568, 0.12, 0.15);
 // drops: whoosh on release, jingle on landing (~0.55s later)
-for (const [t, n] of [[7.0, 4], [8.5, 8], [10.0, 16], [11.5, 32], [13.0, 64], [18.6, 128]]) {
+for (const [t, n] of [[7.0, 4], [8.5, 8], [10.0, 16], [11.5, 32], [13.0, 64], [14.8, 128]]) {
   whoosh(t, 0.12, 0.5);
   const lvl = Math.log2(n) - 1;       // 1..6
   jingle(t + 0.55, 14 + lvl * 14, 0.05 + 0.006 * lvl);
@@ -39,8 +39,10 @@ for (const [t, n] of [[7.0, 4], [8.5, 8], [10.0, 16], [11.5, 32], [13.0, 64], [1
 for (const [ty, ed, dn] of [[16.9, 17.9, 18.4], [21.9, 22.9, 23.4]]) {
   typing(ty, ed - 0.15); tone(ed, 1046.5, 0.08, 0.04); tone(dn, 1318.5, 0.12, 0.12); tone(dn + 0.1, 1568, 0.12, 0.15);
 }
-// gold shimmer
-for (let k = 0; k < 7; k++) tone(23.45 + k * 0.06, [1568, 1760, 2093, 2349, 2637, 3136, 3520][k], 0.07, 0.25, 0.2);
+// sphere -> cube morph: rising sweep + chain rattle as the net is pushed out
+{ const s0 = Math.floor(23.4 * SR), len = Math.floor(0.9 * SR); let ph = 0;
+  for (let i = 0; i < len; i++) { const x = i / len, f = 140 + 520 * x * x; ph += 2 * Math.PI * f / SR; buf[s0 + i] += 0.16 * Math.sin(Math.PI * x) * (Math.sin(ph) + 0.3 * Math.sin(2 * ph)); } }
+jingle(23.6, 60, 0.06); tone(24.3, 110, 0.2, 0.09, 0.1);
 // scene whooshes
 for (const t of [2.85, 6.9, 16.4, 21.4, 28.0, 31.0]) whoosh(t);
 // limiter + fade
