@@ -3,3 +3,12 @@
 Landing page for the Hire Claude ebook collection by Jerry (@Jerryxaut).
 
 Live site: https://jerryxaut.my.id
+
+## Videos
+
+Download page: https://jerryxaut.my.id/dl/
+
+- Video 1 · Made by Claude
+- Video 2 · Inbox
+- Video 3 · Claude Rebuild (34s), source in `video/v3/`
+- Video 4 · Claude 3D Cloth (34s), source in `video/v4/`
