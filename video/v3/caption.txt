@@ -1,0 +1,15 @@
+This reel got 36M views. So I asked Claude Code to rebuild it 🤯
+
+One prompt → a full physics sim. Two pistons slam together, and every ball they squeeze splits in two.
+
+Then I just asked for changes, live:
+→ "make the balls bigger"
+→ "add 2 more pistons"
+
+No game engine. Just HTML + JavaScript, built in one session.
+
+Comment "PROMPT" and I'll DM you the exact prompt I used 👇
+
+🎥 Original by @nexusboxlab (go follow, their sims are insane)
+
+#claudecode #claude #ai #aitools #satisfying #satisfyingvideos #physics #coding #nocode #creativecoding

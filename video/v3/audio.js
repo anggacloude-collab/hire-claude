@@ -1,0 +1,56 @@
+// Synthesizes the soundtrack: soft pings for spawns/conversions, typing ticks, UI blips, a win chord.
+const fs = require('fs');
+const [,, evFile, outFile] = process.argv;
+const SR = 44100, DUR = +(process.env.DUR || 34), buf = new Float32Array(SR * DUR);
+const NOTES = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5]; // C major pentatonic per color
+function tone(t, f, amp, dec, harm = 0.25) {
+  const s0 = Math.floor(t * SR), len = Math.floor(dec * 6 * SR);
+  for (let i = 0; i < len && s0 + i < buf.length; i++) {
+    const x = i / SR, e = Math.exp(-x / dec) * Math.min(1, i / 40);
+    buf[s0 + i] += amp * e * (Math.sin(2 * Math.PI * f * x) + harm * Math.sin(4 * Math.PI * f * x));
+  }
+}
+function click(t, amp, f = 2400) { tone(t, f, amp, 0.006, 0.6); }
+const ev = JSON.parse(fs.readFileSync(evFile));
+// bucket events per 1/60s frame, cap density so it stays pleasant
+const byFrame = new Map();
+for (const e of ev) { const k = Math.floor(e.t * 60); if (!byFrame.has(k)) byFrame.set(k, []); byFrame.get(k).push(e); }
+for (const [k, list] of byFrame) {
+  const t = k / 60;
+  const splits = list.filter(e => e.type === 'split');
+  splits.slice(0, 3).forEach((e, j) => tone(t + j * 0.005, NOTES[e.c % NOTES.length] * 2, 0.06 * (splits.length > 3 ? 1.3 : 1), 0.06));
+  if (list.some(e => e.type === 'slam')) { tone(t, 70, 0.35, 0.09, 0.1); tone(t, 140, 0.12, 0.04, 0.3); }
+  if (list.some(e => e.type === 'full')) [0, 0.09, 0.18, 0.3].forEach((d, j) => tone(t + d, NOTES[j % 4] * (j === 3 ? 2 : 1), 0.22, 0.5, 0.3));
+}
+// prompt typing (3.3s - 4.8s) and live fixes: typing, edit blip, done chime
+const typing = (a, b) => { for (let t = a; t < b; t += 0.035 + 0.015 * Math.abs(Math.sin(t * 37))) click(t, 0.06, 3000 + 800 * Math.sin(t * 91)); };
+typing(3.3, 4.8);
+[5.0, 5.3, 5.6, 5.9, 6.2].forEach(t => tone(t, 1046.5, 0.08, 0.04));
+tone(6.5, 1318.5, 0.12, 0.12); tone(6.6, 1568, 0.12, 0.15);
+for (const [ty, ed, dn] of [[12.9, 14.0, 14.5], [19.0, 20.2, 20.6]]) {
+  typing(ty, ed - 0.15); tone(ed, 1046.5, 0.08, 0.04); tone(dn, 1318.5, 0.12, 0.12); tone(dn + 0.1, 1568, 0.12, 0.15);
+  const s0 = Math.floor(dn * SR), len = Math.floor(0.7 * SR); let ph = 0;
+  for (let i = 0; i < len; i++) { const x = i / len, f = 220 + 660 * x * x; ph += 2 * Math.PI * f / SR; buf[s0 + i] += 0.1 * Math.sin(Math.PI * x) * Math.sin(ph); }
+}
+// whooshes on scene changes (filtered noise)
+let seed = 1; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
+for (const t of [2.85, 6.9, 12.4, 18.4, 28.0, 31.0]) {
+  const s0 = Math.floor(t * SR), len = Math.floor(0.45 * SR); let lp = 0;
+  for (let i = 0; i < len; i++) { const x = i / len, env = Math.sin(Math.PI * x) ** 2; lp += (rnd() - lp) * (0.05 + 0.25 * x); buf[s0 + i] += 0.18 * env * lp; }
+}
+// hook "pop" when the view counter gets highlighted
+tone(1.7, 880, 0.15, 0.08); tone(1.78, 1318.5, 0.15, 0.12);
+// soft limiter + fade out
+let peak = 0; for (const v of buf) peak = Math.max(peak, Math.abs(v));
+const g = 0.9 / Math.max(0.3, Math.tanh(peak));
+const pcm = Buffer.alloc(buf.length * 2);
+for (let i = 0; i < buf.length; i++) {
+  const fade = Math.min(1, (buf.length - i) / (SR * 0.6));
+  pcm.writeInt16LE(Math.round(Math.max(-1, Math.min(1, Math.tanh(buf[i]) * g * fade)) * 32767), i * 2);
+}
+const h = Buffer.alloc(44);
+h.write('RIFF', 0); h.writeUInt32LE(36 + pcm.length, 4); h.write('WAVE', 8); h.write('fmt ', 12);
+h.writeUInt32LE(16, 16); h.writeUInt16LE(1, 20); h.writeUInt16LE(1, 22); h.writeUInt32LE(SR, 24); h.writeUInt32LE(SR * 2, 28);
+h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write('data', 36); h.writeUInt32LE(pcm.length, 40);
+fs.writeFileSync(outFile, Buffer.concat([h, pcm]));
+console.log('audio peak', peak.toFixed(2), 'events', ev.length);
