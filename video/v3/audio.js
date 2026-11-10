@@ -24,12 +24,17 @@ for (const [k, list] of byFrame) {
 }
 // typing ticks while the prompt is typed (3.4s - 6.4s)
 for (let t = 3.4; t < 6.4; t += 0.035 + 0.02 * Math.abs(Math.sin(t * 37))) click(t, 0.06, 3000 + 800 * Math.sin(t * 91));
+// live fix: typing, edit blip, then a rising 'grow' sweep when the balls get bigger
+for (let t = 24.3; t < 25.8; t += 0.045 + 0.02 * Math.abs(Math.sin(t * 37))) click(t, 0.06, 3000 + 800 * Math.sin(t * 91));
+tone(26.2, 1046.5, 0.08, 0.04); tone(27.0, 1318.5, 0.12, 0.12); tone(27.1, 1568, 0.12, 0.15);
+{ const s0 = Math.floor(27.0 * SR), len = Math.floor(0.8 * SR); let ph = 0;
+  for (let i = 0; i < len; i++) { const x = i / len, f = 220 + 660 * x * x; ph += 2 * Math.PI * f / SR; buf[s0 + i] += 0.1 * Math.sin(Math.PI * x) * Math.sin(ph); } }
 // step lines blips
 [6.9, 7.4, 7.9, 8.4, 8.9].forEach(t => tone(t, 1046.5, 0.08, 0.04));
 tone(9.4, 1318.5, 0.12, 0.12); tone(9.5, 1568, 0.12, 0.15);
 // whooshes on scene changes (filtered noise)
 let seed = 1; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
-for (const t of [2.85, 9.9, 52.0, 57.0]) {
+for (const t of [2.85, 9.9, 23.7, 52.0, 57.0]) {
   const s0 = Math.floor(t * SR), len = Math.floor(0.45 * SR); let lp = 0;
   for (let i = 0; i < len; i++) { const x = i / len, env = Math.sin(Math.PI * x) ** 2; lp += (rnd() - lp) * (0.05 + 0.25 * x); buf[s0 + i] += 0.18 * env * lp; }
 }

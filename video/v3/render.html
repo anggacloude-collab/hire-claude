@@ -13,7 +13,7 @@ const W = 1080, H = 1920, FPS = 60;
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 const BG = '#ECE6DF', GRID = 'rgba(0,0,0,0.045)', INK = '#141414', MUTED = '#77716B', BLUE = '#2F6BFF', ORANGE = '#D97757';
 const SEG = ['#2F6BFF', '#16A34A', '#EA580C', '#7C3AED', '#E11D48', '#0D9488'];
-const SIM_START = 10, SIM_SEED = 2;
+const SIM_START = 10, SIM_SEED = 1, REV_SIM_T = 17, REV_BR = 25, REV_CAP = 850;
 const PROMPT = 'Rebuild this reel as code: balls in a circle arena, two pistons that slam together. Any ball hit or squeezed by a piston splits in two. Keep going until the arena is full.';
 const STEPS = [
   [6.9, '● Writing arena.html'],
@@ -63,6 +63,7 @@ window.simEvents = [];
 function advanceSim(t) {
   const target = Math.max(0, Math.round((t - SIM_START) * FPS));
   while (simFrames < target) {
+    if (simFrames === REV_SIM_T * FPS) sim.setBall(REV_BR, REV_CAP);
     for (let k = 0; k < 4; k++) sim.step(1 / 240); simFrames++;
     for (const e of sim.events) window.simEvents.push({ t: e.t + SIM_START, type: e.type, c: e.c, mag: e.mag });
     sim.events.length = 0;
@@ -99,7 +100,8 @@ function background(t) {
 const TITLES = [
   { t0: 0, t1: 3, k: 'THE ORIGINAL · @NEXUSBOXLAB', b: 'This one got', i: '36M views' },
   { t0: 3, t1: 10, k: 'STEP 1 · ONE PROMPT', b: 'So I gave it to', i: 'Claude Code' },
-  { t0: 10, t1: 30, k: 'SIDE BY SIDE', b: 'Original vs', i: "Claude's version" },
+  { t0: 10, t1: 23.6, k: 'SIDE BY SIDE', b: 'Original vs', i: "Claude's version" },
+  { t0: 23.6, t1: 30, k: 'STEP 2 · ASK FOR A FIX', b: 'Balls too small?', i: 'Just ask' },
   { t0: 30, t1: 52, k: 'WATCH THE PISTONS', b: 'Every squeeze', i: 'makes two' },
   { t0: 52, t1: 57, k: 'NO GAME ENGINE · JUST CODE', b: 'Built in', i: 'one session' },
   { t0: 57, t1: 61, k: 'WANT TO MAKE ONE?', b: 'Comment', i: '“PROMPT”' },
@@ -127,7 +129,7 @@ function titles(t) {
 }
 
 // ---------- panels ----------
-const PL = { x: 70, y: 700, w: 460, h: 860 }, PR = { x: 550, y: 700, w: 460, h: 860 };
+const PL = { x: 70, y: 700, w: 320, h: 860 }, PR = { x: 410, y: 700, w: 600, h: 860 };
 const PSOLO = { x: 70, y: 660, w: 940, h: 1000 };
 const CARD = { x: 170, y: 650, w: 740, h: 1060 };
 
@@ -151,15 +153,19 @@ function drawCover(img, s, r, alpha) {
   if (sa > ra) { sw = sh * ra; sx += (s.w - sw) / 2; } else { sh = sw / ra; sy += (s.h - sh) / 2; }
   ctx.globalAlpha = alpha; ctx.drawImage(img, sx, sy, sw, sh, r.x, r.y, r.w, r.h); ctx.globalAlpha = 1;
 }
+function drawContain(img, s, r, alpha) {
+  const k = Math.min(r.w / s.w, r.h / s.h), w = s.w * k, h = s.h * k;
+  ctx.globalAlpha = alpha; ctx.drawImage(img, s.x, s.y, s.w, s.h, r.x + (r.w - w) / 2, r.y + (r.h - h) / 2, w, h); ctx.globalAlpha = 1;
+}
 function leftPanel(r, t, alpha) {
   ctx.save(); ctx.globalAlpha = alpha;
   panelFrame(r, 'ORIGINAL', MUTED, null);
   ctx.save(); rr(r.x, r.y, r.w, r.h, 28); ctx.clip();
   if (window.leftImg) {
     const im = window.leftImg;
-    drawCover(im, { x: 0, y: 0, w: im.naturalWidth, h: im.naturalHeight }, r, alpha);
+    drawContain(im, { x: 0, y: 0, w: im.naturalWidth, h: im.naturalHeight }, r, alpha);
   } else {
-    drawCover(profile, TILE, r, alpha);
+    drawContain(profile, TILE, r, alpha);
   }
   ctx.restore();
   // credit
@@ -326,6 +332,28 @@ function caption(t) {
 }
 
 // ---------- main frame ----------
+const FIX = 'make the balls bigger';
+function fixBox(r, t) {
+  const t0 = 23.8, t1 = 29.4;
+  if (t < t0 || t > t1) return;
+  const k = Math.min(ease((t - t0) / 0.35), 1 - ease((t - t1 + 0.35) / 0.35));
+  const bw = r.w - 40, bh = 150, bx = r.x + 20, by = r.y + r.h - bh - 20 + (1 - k) * 60;
+  ctx.save(); ctx.globalAlpha = k;
+  ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 30;
+  ctx.fillStyle = '#1B1B1B'; rr(bx, by, bw, bh, 18); ctx.fill(); ctx.shadowBlur = 0;
+  ctx.strokeStyle = ORANGE; ctx.lineWidth = 2; rr(bx, by, bw, bh, 18); ctx.stroke();
+  ctx.textAlign = 'left'; ctx.font = '700 19px "JetBrains Mono"'; ctx.fillStyle = ORANGE;
+  ctx.fillText('✻ Claude Code', bx + 20, by + 34);
+  ctx.font = '500 24px "JetBrains Mono"'; ctx.fillStyle = '#F2F2F2';
+  const typed = FIX.slice(0, Math.floor(clamp((t - 24.3) / 1.5, 0, 1) * FIX.length));
+  const line = '> ' + typed; ctx.fillText(line, bx + 20, by + 76);
+  if (t < 26.1 && Math.floor(t * 3) % 2 === 0) ctx.fillRect(bx + 22 + ctx.measureText(line).width, by + 56, 12, 26);
+  ctx.font = '500 19px "JetBrains Mono"';
+  if (t >= 27.0) { ctx.fillStyle = '#4ADE80'; ctx.fillText('✓ Done. Balls are bigger now', bx + 20, by + 120); }
+  else if (t >= 26.2) { ctx.fillStyle = '#C9C9C9'; ctx.fillText('● Editing sim.js · BALL_RADIUS 16 → 25', bx + 20, by + 120); }
+  ctx.restore();
+}
+
 window.renderFrame = function (i) {
   const t = i / FPS;
   advanceSim(t);
@@ -352,6 +380,7 @@ window.renderFrame = function (i) {
     ctx.save(); ctx.globalAlpha = a; panelFrame(r, label, INK, ORANGE); ctx.restore();
     if (t < 10.4) terminal(r, t, a * (1 - ease((t - 9.9) / 0.5)));
     if (t >= 9.9) arena(r, t, ease((t - 9.9) / 0.5));
+    fixBox(r, t);
   }
   caption(t);
 };

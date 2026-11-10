@@ -14,7 +14,7 @@
 
   function createSim(opts) {
     opts = opts || {};
-    const R = 1000, BR = opts.br || 16, CAP = opts.cap || 1400, SPEED = 480;
+    const R = 1000, SPEED = 480; let BR = opts.br || 16, CAP = opts.cap || 1400;
     const HEAD_W = 150, HEAD_H = opts.headH || 300, ROD_H = 44, GMIN = 4, GMAX = 800;
     const rand = rng(opts.seed || 7);
     const balls = [];
@@ -54,11 +54,12 @@
       ];
     }
 
-    const CELL = BR * 2.2, GW = Math.ceil((2 * R) / CELL) + 4;
+    const CELL = (opts.maxBr || 30) * 2.2, GW = Math.ceil((2 * R) / CELL) + 4;
     const grid = new Map();
 
     function step(dt) {
       S.t += dt;
+      if (S.targetBR && Math.abs(S.targetBR - BR) > 0.01) { BR += (S.targetBR - BR) * Math.min(1, dt * 5); S.BR = BR; }
       S.period = Math.max(1.05, 2.6 - S.t * 0.04);
       const prevPhase = S.phase;
       S.phase = (S.phase + dt / S.period) % 1;
@@ -135,6 +136,8 @@
       }
       if (!S.full && balls.length >= CAP) { S.full = true; S.fullTime = S.t; emit('full', 0); }
     }
+    // live revision: grow the balls and lower the cap so the arena still fills up
+    S.setBall = function (br, cap) { S.targetBR = br; CAP = cap; S.CAP = cap; };
     S.step = step;
     return S;
   }
