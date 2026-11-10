@@ -1,0 +1,15 @@
+This 3D sim got 111M views. So I asked Claude Code to rebuild it 🤯
+
+A chain-mail net drops onto a marble ball, and every drop gets more detailed: 16 → 64 → 256 → 1,024 → 4,096 faces. Real cloth physics, rendered in the browser.
+
+Then I just asked for changes, live:
+→ "go to 16K faces"
+→ "make the chain gold"
+
+No Blender. Just Three.js + JavaScript, built in one session.
+
+Comment "PROMPT" and I'll DM you the exact prompt I used 👇
+
+🎥 Original by @morp.hik3d (go follow, their 3D work is unreal)
+
+#claudecode #claude #ai #aitools #3d #threejs #clothsimulation #satisfying #satisfyingvideos #creativecoding
