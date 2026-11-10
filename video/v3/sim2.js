@@ -21,7 +21,7 @@
     const S = {
       t: 0, balls, events: [], R, BR, CAP, COLORS, NAMES, counts: COLORS.map(() => 0),
       HEAD_W, HEAD_H, ROD_H, gap: GMAX, splits: 0, slams: 0, full: false, fullTime: 0,
-      phase: 0, period: 2.6, shake: 0, splitCd: 0.35, hitV: opts.hitV || 500, hitP: opts.hitP || 0.6, pressP: opts.pressP || 0.5,
+      phase: 0, period: opts.period0 || 2.6, shake: 0, gapV: 2000, vertOn: false, vertAppear: 0, splitCd: 0.35, hitV: opts.hitV || 500, hitP: opts.hitP || 0.6, pressP: opts.pressP || 0.5,
     };
     function add(x, y, vx, vy, c) { const b = { x, y, vx, vy, c, cd: 0.3, flash: 0 }; balls.push(b); S.counts[c]++; return b; }
     for (let c = 0; c < COLORS.length; c++) {
@@ -33,6 +33,7 @@
     function split(b, pnx, pny) {
       let px = -pny, py = pnx;              // split perpendicular to the squeeze
       if (Math.abs(pnx) > 0.7 && Math.abs(b.y) > 1) { py = Math.sign(b.y); px = 0; } // pop out of the jaws
+      else if (Math.abs(pny) > 0.7 && Math.abs(b.x) > 1) { px = Math.sign(b.x); py = 0; }
       const nb = add(b.x + px * BR, b.y + py * BR, px * SPEED * 1.1, py * SPEED * 1.1, b.c);
       b.x -= px * BR; b.y -= py * BR; b.vx = -px * SPEED * 1.1; b.vy = -py * SPEED * 1.1;
       b.cd = nb.cd = S.splitCd; b.flash = nb.flash = 0.3;
@@ -47,11 +48,15 @@
       const k = (p - 0.48) / 0.52; return GMIN + (GMAX - GMIN) * (k * k * (3 - 2 * k));
     }
     // boxes: [xmin, xmax, ymin, ymax, vx]
-    function boxes(g, vg) {
-      return [
+    function boxes(g, vg, gv, vgv) {
+      const out = [
         [-g - HEAD_W, -g, -HEAD_H / 2, HEAD_H / 2, -vg, 0], [-1200, -g - HEAD_W, -ROD_H / 2, ROD_H / 2, -vg, 0],
         [g, g + HEAD_W, -HEAD_H / 2, HEAD_H / 2, vg, 1], [g + HEAD_W, 1200, -ROD_H / 2, ROD_H / 2, vg, 1],
       ];
+      if (S.vertOn) out.push(  // [xmin, xmax, ymin, ymax, vx, id, vy]
+        [-HEAD_H / 2, HEAD_H / 2, -gv - HEAD_W, -gv, 0, 2, -vgv], [-ROD_H / 2, ROD_H / 2, -1200 - gv, -gv - HEAD_W, 0, 2, -vgv],
+        [-HEAD_H / 2, HEAD_H / 2, gv, gv + HEAD_W, 0, 3, vgv], [-ROD_H / 2, ROD_H / 2, gv + HEAD_W, 1200 + gv, 0, 3, vgv]);
+      return out;
     }
 
     const CELL = (opts.maxBr || 30) * 2.2, GW = Math.ceil((2 * R) / CELL) + 4;
@@ -60,7 +65,7 @@
     function step(dt) {
       S.t += dt;
       if (S.targetBR && Math.abs(S.targetBR - BR) > 0.01) { BR += (S.targetBR - BR) * Math.min(1, dt * 5); S.BR = BR; }
-      S.period = Math.max(1.05, 2.6 - S.t * 0.04);
+      S.period = Math.max(opts.periodMin || 1.05, (opts.period0 || 2.6) - S.t * (opts.periodRate || 0.04));
       const prevPhase = S.phase;
       S.phase = (S.phase + dt / S.period) % 1;
       if (prevPhase < 0.38 && S.phase >= 0.38) { S.slams++; S.shake = 1; emit('slam', 0); }
@@ -68,7 +73,15 @@
       const gOld = S.gap, g = pistonG(S.phase);
       const vg = (g - gOld) / dt; // >0 opening
       S.gap = g;
-      const B = boxes(g, vg);
+      let gv = S.gapV, vgv = 0;
+      if (S.vertOn) {
+        S.vertAppear = Math.min(1, S.vertAppear + dt / 0.6);
+        const pv = (S.phase + 0.5) % 1, pvPrev = (prevPhase + 0.5) % 1;
+        if (pvPrev < 0.38 && pv >= 0.38) { S.slams++; S.shake = 1; emit('slam', 0); }
+        const a = 1 - S.vertAppear; gv = pistonG(pv) + a * a * 900;
+        vgv = (gv - S.gapV) / dt; S.gapV = gv;
+      }
+      const B = boxes(g, vg, gv, vgv);
       for (let i = 0; i < balls.length; i++) {
         const b = balls[i];
         b.x += b.vx * dt; b.y += b.vy * dt;
@@ -87,10 +100,10 @@
             pen = m + BR;
           } else { if (d >= BR) continue; nx = dx / d; ny = dy / d; pen = BR - d; }
           b.x += nx * pen; b.y += ny * pen;
-          const rvx = b.vx - bx[4], vn = rvx * nx + b.vy * ny;
+          const bvy = bx[6] || 0, rvx = b.vx - bx[4], rvy = b.vy - bvy, vn = rvx * nx + rvy * ny;
           if (vn < 0) { b.vx -= 2 * vn * nx; b.vy -= 2 * vn * ny; }
           // a hard hit from the moving piston also splits the ball
-          if (bx[4] * nx > S.hitV && b.cd <= 0 && balls.length < CAP && rand() < S.hitP) { split(b, nx, ny); continue; }
+          if (bx[4] * nx + bvy * ny > S.hitV && b.cd <= 0 && balls.length < CAP && rand() < S.hitP) { split(b, nx, ny); continue; }
           if (pist >= 0 && bx[5] !== pist) { other = true; onx = nx; ony = ny; }
           else if (pist < 0) { pist = bx[5]; pnx = nx; pny = ny; }
         }
@@ -137,6 +150,7 @@
       if (!S.full && balls.length >= CAP) { S.full = true; S.fullTime = S.t; emit('full', 0); }
     }
     // live revision: grow the balls and lower the cap so the arena still fills up
+    S.addVertical = function () { S.vertOn = true; };
     S.setBall = function (br, cap) { S.targetBR = br; CAP = cap; S.CAP = cap; };
     S.step = step;
     return S;

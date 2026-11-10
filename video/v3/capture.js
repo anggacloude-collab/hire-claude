@@ -2,9 +2,9 @@
 const { chromium } = require('playwright');
 const { spawn, execFileSync } = require('child_process');
 const fs = require('fs'), path = require('path');
-const FPS = 60, DUR = 60, N = FPS * DUR;
+const FPS = 60, DUR = +(process.env.DUR || 34), N = FPS * DUR;
 const out = process.argv[2] || 'out.mp4';
-const leftDir = process.argv[3]; // optional: folder of left-panel frames f_00001.jpg... (60fps, starting at video t=3.4s)
+const leftDir = process.argv[3]; const leftCount = leftDir ? fs.readdirSync(leftDir).length : 0; // optional: folder of left-panel frames f_00001.jpg... (60fps, starting at video t=3.4s)
 (async () => {
   const b = await chromium.launch({ args: ['--allow-file-access-from-files'] });
   const p = await b.newPage({ viewport: { width: 1080, height: 1920 } });
@@ -17,8 +17,7 @@ const leftDir = process.argv[3]; // optional: folder of left-panel frames f_0000
   for (let i = 0; i < N; i++) {
     if (leftDir) {
       const t = i / FPS, k = Math.floor((t - 3.4) * FPS) + 1;
-      const files = fs.readdirSync(leftDir).length;
-      const f = path.resolve(leftDir, `f_${String(((Math.max(k, 1) - 1) % files) + 1).padStart(5, '0')}.jpg`);
+      const f = path.resolve(leftDir, `f_${String(((Math.max(k, 1) - 1) % leftCount) + 1).padStart(5, '0')}.jpg`);
       await p.evaluate(src => new Promise(r => { const im = new Image(); im.onload = () => { window.leftImg = im; r(); }; im.src = 'file://' + src; }), f);
     }
     const d = await p.evaluate(i => { window.renderFrame(i); return document.getElementById('c').toDataURL('image/jpeg', 0.93); }, i);

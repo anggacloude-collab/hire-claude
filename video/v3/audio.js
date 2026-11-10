@@ -1,7 +1,7 @@
 // Synthesizes the soundtrack: soft pings for spawns/conversions, typing ticks, UI blips, a win chord.
 const fs = require('fs');
 const [,, evFile, outFile] = process.argv;
-const SR = 44100, DUR = 60, buf = new Float32Array(SR * DUR);
+const SR = 44100, DUR = +(process.env.DUR || 34), buf = new Float32Array(SR * DUR);
 const NOTES = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5]; // C major pentatonic per color
 function tone(t, f, amp, dec, harm = 0.25) {
   const s0 = Math.floor(t * SR), len = Math.floor(dec * 6 * SR);
@@ -22,19 +22,19 @@ for (const [k, list] of byFrame) {
   if (list.some(e => e.type === 'slam')) { tone(t, 70, 0.35, 0.09, 0.1); tone(t, 140, 0.12, 0.04, 0.3); }
   if (list.some(e => e.type === 'full')) [0, 0.09, 0.18, 0.3].forEach((d, j) => tone(t + d, NOTES[j % 4] * (j === 3 ? 2 : 1), 0.22, 0.5, 0.3));
 }
-// typing ticks while the prompt is typed (3.4s - 6.4s)
-for (let t = 3.4; t < 6.4; t += 0.035 + 0.02 * Math.abs(Math.sin(t * 37))) click(t, 0.06, 3000 + 800 * Math.sin(t * 91));
-// live fix: typing, edit blip, then a rising 'grow' sweep when the balls get bigger
-for (let t = 24.3; t < 25.8; t += 0.045 + 0.02 * Math.abs(Math.sin(t * 37))) click(t, 0.06, 3000 + 800 * Math.sin(t * 91));
-tone(26.2, 1046.5, 0.08, 0.04); tone(27.0, 1318.5, 0.12, 0.12); tone(27.1, 1568, 0.12, 0.15);
-{ const s0 = Math.floor(27.0 * SR), len = Math.floor(0.8 * SR); let ph = 0;
-  for (let i = 0; i < len; i++) { const x = i / len, f = 220 + 660 * x * x; ph += 2 * Math.PI * f / SR; buf[s0 + i] += 0.1 * Math.sin(Math.PI * x) * Math.sin(ph); } }
-// step lines blips
-[6.9, 7.4, 7.9, 8.4, 8.9].forEach(t => tone(t, 1046.5, 0.08, 0.04));
-tone(9.4, 1318.5, 0.12, 0.12); tone(9.5, 1568, 0.12, 0.15);
+// prompt typing (3.3s - 4.8s) and live fixes: typing, edit blip, done chime
+const typing = (a, b) => { for (let t = a; t < b; t += 0.035 + 0.015 * Math.abs(Math.sin(t * 37))) click(t, 0.06, 3000 + 800 * Math.sin(t * 91)); };
+typing(3.3, 4.8);
+[5.0, 5.3, 5.6, 5.9, 6.2].forEach(t => tone(t, 1046.5, 0.08, 0.04));
+tone(6.5, 1318.5, 0.12, 0.12); tone(6.6, 1568, 0.12, 0.15);
+for (const [ty, ed, dn] of [[12.9, 14.0, 14.5], [19.0, 20.2, 20.6]]) {
+  typing(ty, ed - 0.15); tone(ed, 1046.5, 0.08, 0.04); tone(dn, 1318.5, 0.12, 0.12); tone(dn + 0.1, 1568, 0.12, 0.15);
+  const s0 = Math.floor(dn * SR), len = Math.floor(0.7 * SR); let ph = 0;
+  for (let i = 0; i < len; i++) { const x = i / len, f = 220 + 660 * x * x; ph += 2 * Math.PI * f / SR; buf[s0 + i] += 0.1 * Math.sin(Math.PI * x) * Math.sin(ph); }
+}
 // whooshes on scene changes (filtered noise)
 let seed = 1; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) * 2 - 1;
-for (const t of [2.85, 9.9, 23.7, 52.0, 57.0]) {
+for (const t of [2.85, 6.9, 12.4, 18.4, 28.0, 31.0]) {
   const s0 = Math.floor(t * SR), len = Math.floor(0.45 * SR); let lp = 0;
   for (let i = 0; i < len; i++) { const x = i / len, env = Math.sin(Math.PI * x) ** 2; lp += (rnd() - lp) * (0.05 + 0.25 * x); buf[s0 + i] += 0.18 * env * lp; }
 }
