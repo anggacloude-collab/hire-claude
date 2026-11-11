@@ -16,3 +16,4 @@ Download page: https://jerryxaut.my.id/dl/
 - Video 6 · Posting then silence (Content Autopilot)
 - Video 7 · Follow-up (Sales Engine)
 - Video 8 · Late invoices (Admin Killer)
+- Meme 1 · Claude money
