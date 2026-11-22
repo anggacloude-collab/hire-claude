@@ -19,3 +19,4 @@ Download page: https://jerryxaut.my.id/dl/
 - Meme 1 · Claude money
 - Meme 2 · Opus 5.5 users
 - Carousel 1 · Hire Claude (9 slides)
+- Carousel 2 · Holiday plan (9 slides)
