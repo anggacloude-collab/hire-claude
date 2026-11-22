@@ -18,3 +18,4 @@ Download page: https://jerryxaut.my.id/dl/
 - Video 8 · Late invoices (Admin Killer)
 - Meme 1 · Claude money
 - Meme 2 · Opus 5.5 users
+- Carousel 1 · Hire Claude (9 slides)
